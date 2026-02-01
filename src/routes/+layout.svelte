@@ -59,7 +59,7 @@
 		--color-background: #222222;
 		--color-text: #d4a574;
 		--color-red-light: #d14545;
-		--color-red-shadow: rgba(193, 48, 48, 0.3);
+		--color-red-shadow: #c130304d;
 	}
 
 	:global(body) {
