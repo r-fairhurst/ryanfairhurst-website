@@ -1,7 +1,16 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
+	import Terminal from '$lib/components/Terminal.svelte';
+	import { page } from '$app/stores';
 
 	let { children } = $props();
+	
+	// Generate terminal title based on current route
+	const getTerminalTitle = $derived(() => {
+		const pathname = $page.route?.id || '/';
+		const routeName = pathname === '/' ? 'home' : pathname.replace('/', '');
+		return `you@ryanfairhurst.com:~/${routeName}`;
+	});
 </script>
 
 <svelte:head>
@@ -34,17 +43,55 @@
 	</style>
 </svelte:head>
 
-{@render children()}
+<Terminal 
+	title={getTerminalTitle()}
+	showBackButton={false} 
+	draggable={true} 
+	resizable={true}
+>
+	{@render children()}
+</Terminal>
 
 <style>
+	:root {
+		/* Global color variables */
+		--color-red: #851919;
+		--color-red-dark: #651515;
+		--color-background: #222222;
+		--color-text: #222222;
+		--color-red-light: #a52525;
+		--color-red-shadow: rgba(133, 25, 25, 0.3);
+	}
+
 	:global(body) {
 		margin: 0;
 		font-family: 'Terminess Nerd Font', system-ui, monospace;
-		background-color: #222222;
-		color: #e0e0e0;
+		background-color: var(--color-background);
+		color: var(--color-text);
 		font-size: 1rem;
 	}
 
+	:global(h1) {
+		font-size: 3rem;
+		margin-bottom: 0.5rem;
+		border-bottom: 2px solid var(--color-red);
+	}
+
+	:global(h2) {
+		font-size: 2rem;
+		margin-bottom: 0.5rem;
+		border-bottom: 1px solid var(--color-red);
+	}
+
+	:global(h3) {
+		font-size: 1.5rem;
+		margin-bottom: 0.5rem;
+	}
+
+	:global(p) {
+		font-size: 1.25rem;
+		color: var(--color-red);
+	}
 
 	:global(ul) {
 		list-style-type: none;
@@ -54,11 +101,34 @@
 	:global(li) {
 		margin: 0.25rem 0;
 		font-size: 1.5rem;
+		color: var(--color-red);
 	}
 
 	:global(li:hover) {
-		background-color: #851919;
-		color: #222222;
+		background-color: var(--color-red);
+		color: var(--color-background);
+	}
+
+	:global(li:hover a) {
+		color: var(--color-background);
+	}
+
+	:global(a) {
+		color: var(--color-red);
+		text-decoration: underline;
+	}
+	
+	:global(a:hover) {
+		color: var(--color-background) !important;
+		background-color: var(--color-red);
+	}
+	
+	:global(a:visited) {
+		color: var(--color-red-dark);
+	}
+
+	:global(a:hover:visited) {
+		color: var(--color-background) !important;
 	}
 
 	/* Custom red scrollbar */
@@ -68,27 +138,26 @@
 	}
 
 	:global(*::-webkit-scrollbar-track) {
-		background: #222222;
+		background: var(--color-background);
 		border-radius: 6px;
 	}
 
 	:global(*::-webkit-scrollbar-thumb) {
-		background: #851919;
+		background: var(--color-red);
 		border-radius: 6px;
-		border: 2px solid #222222;
+		border: 2px solid var(--color-background);
 	}
 
 	:global(*::-webkit-scrollbar-thumb:hover) {
-		background: #a52525;
+		background: var(--color-red-light);
 	}
 
 	:global(*::-webkit-scrollbar-corner) {
-		background: #222222;
+		background: var(--color-background);
 	}
 
 	/* Firefox scrollbar */
 	:global(*) {
-		scrollbar-width: thin;
-		scrollbar-color: #851919 #222222;
+		scrollbar-color: var(--color-red) var(--color-background);
 	}
 </style>

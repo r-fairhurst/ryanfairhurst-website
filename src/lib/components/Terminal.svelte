@@ -168,14 +168,14 @@
     .terminal {
         font-family: 'Terminess Nerd Font', system-ui, monospace;
         background-color: inherit;
-        color: #851919;
+        color: var(--color-red);
         
-        width: 600px;
-        height: 400px;
+        width: 1200px;
+        height: 500px;
         min-width: 300px;
         min-height: 200px;
         
-        border: 2px solid #851919;
+        border: 2px solid var(--color-red);
         overflow: hidden;
         
         /* Enable interaction */
@@ -184,9 +184,8 @@
         
         /* Position the box in the center of the screen initially */
         position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
+        top: calc(50% - 250px); /* Half of initial height (500px) */
+        left: calc(50% - 400px); /* Half of initial width (800px) */
         
         /* Flex layout for content */
         display: flex;
@@ -207,7 +206,7 @@
         right: 0;
         width: 16px;
         height: 16px;
-        background: linear-gradient(-45deg, transparent 30%, #851919 30%, #851919 40%, transparent 40%, transparent 60%, #851919 60%, #851919 70%, transparent 70%);
+        background: linear-gradient(-45deg, transparent 30%, var(--color-red) 30%, var(--color-red) 40%, transparent 40%, transparent 60%, var(--color-red) 60%, var(--color-red) 70%, transparent 70%);
         cursor: nw-resize;
         opacity: 0.7;
         z-index: 1;
@@ -229,11 +228,11 @@
     .terminal:active,
     .terminal.dragging {
         opacity: 0.9;
-        box-shadow: 0 8px 16px rgba(133, 25, 25, 0.3);
+        box-shadow: 0 8px 16px var(--color-red-shadow);
     }
     
     .terminal.resizing::after {
-        border-color: #851919;
+        border-color: var(--color-red);
         border-style: dashed;
     }
     
@@ -242,11 +241,11 @@
         align-items: center;
         justify-content: space-between;
         padding: 0.5rem 0.75rem;
-        background-color: #851919;
-        color: #222222;
+        background-color: var(--color-red);
+        color: var(--color-background);
         min-height: 2.5rem;
         height: auto;
-        border-bottom: 2px solid #651515;
+        border-bottom: 2px solid var(--color-red-dark);
         flex-shrink: 0;
         user-select: none;
         cursor: move;
@@ -268,8 +267,8 @@
     
     .control-button {
         background: transparent;
-        border-color: #222222;
-        color: #222222;
+        border-color: var(--color-background);
+        color: var(--color-background);
         font-size: 1rem;
         font-weight: bold;
         cursor: pointer;
@@ -286,19 +285,20 @@
     
     .control-button:hover {
         transform: translateY(-1px);
-        border-color: #FFFFFF;
+        background-color: var(--color-background);
+        border-color: var(--color-red);
     }
     
     .control-button.close:hover {
-        color: white;
+        color: var(--color-red);
     }
     
     .control-button.minimize:hover {
-        color: white;
+        color: var(--color-red);
     }
     
     .control-button.maximize:hover {
-        color: white;
+        color: var(--color-red);
     }
     
     .terminal-content {
