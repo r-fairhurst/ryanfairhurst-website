@@ -88,7 +88,7 @@
 	}
 
 	:global(p) {
-		font-size: 1.25rem;
+		font-size: 1.5rem;
 		color: var(--color-red);
 	}
 

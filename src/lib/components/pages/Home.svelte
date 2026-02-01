@@ -1,5 +1,6 @@
-<h1>Welcome to My Site</h1>
-<p>It's created with SvelteKit and interact.js to provide a draggable and resizable window.</p>
+<h1>Welcome!</h1>
+<p>This site serves as a portfolio, showcasing my projects, skills, and experiences.</p>
+<p>It's created with <strong>SvelteKit</strong> and <strong>interact.js</strong> to provide a draggable and resizable window.</p>
 <p>This terminal window can be dragged by its header and resized from any edge!</p>
 
 <div class="navigation">
