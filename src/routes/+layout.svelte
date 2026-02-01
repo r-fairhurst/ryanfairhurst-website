@@ -9,7 +9,7 @@
 	const getTerminalTitle = $derived(() => {
 		const pathname = $page.route?.id || '/';
 		const routeName = pathname === '/' ? 'home' : pathname.replace('/', '');
-		return `you@ryanfairhurst.com:~/${routeName}`;
+		return `root@ryanfairhurst:~/${routeName}`;
 	});
 </script>
 
@@ -54,13 +54,12 @@
 
 <style>
 	:root {
-		/* Global color variables */
-		--color-red: #851919;
-		--color-red-dark: #651515;
+		--color-red: #c13030;
+		--color-red-dark: #8b1f1f;
 		--color-background: #222222;
-		--color-text: #222222;
-		--color-red-light: #a52525;
-		--color-red-shadow: rgba(133, 25, 25, 0.3);
+		--color-text: #d4a574;
+		--color-red-light: #d14545;
+		--color-red-shadow: rgba(193, 48, 48, 0.3);
 	}
 
 	:global(body) {
