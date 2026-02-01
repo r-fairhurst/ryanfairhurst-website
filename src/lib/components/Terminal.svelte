@@ -37,11 +37,10 @@
                     },
                     modifiers: [
                         interactjs.modifiers.restrictRect({
-                            restriction: 'parent',
-                            endOnly: true
+                            restriction: { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight },
+                            elementRect: { top: 0, left: 0, bottom: 1, right: 1 }
                         })
-                    ],
-                    inertia: true
+                    ]
                 });
             }
             
@@ -56,13 +55,12 @@
                     },
                     modifiers: [
                         interactjs.modifiers.restrictEdges({
-                            outer: 'parent'
+                            outer: { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight }
                         }),
                         interactjs.modifiers.restrictSize({
                             min: { width: minWidth, height: minHeight }
                         })
-                    ],
-                    inertia: true
+                    ]
                 });
             }
         }
