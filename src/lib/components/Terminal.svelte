@@ -25,9 +25,23 @@
     let isMaximized = $state(false);
     let originalSize = $state({ width: 1200, height: 500, x: 0, y: 0 });
     let isDragging = $state(false);
+    let currentSize = $state({ width: 1200, height: 500 }); // Track current size
     
     onMount(() => {
         if (terminalElement) {
+            // Set initial position using both CSS properties and transform
+            const initialX = window.innerWidth / 2 - 600; // Half of default width (1200px)
+            const initialY = window.innerHeight / 2 - 250; // Half of default height (500px)
+            
+            // Set position attributes first
+            terminalElement.setAttribute('data-x', initialX.toString());
+            terminalElement.setAttribute('data-y', initialY.toString());
+            
+            // Set both CSS position AND transform to prevent flashing
+            terminalElement.style.left = `${initialX}px`;
+            terminalElement.style.top = `${initialY}px`;
+            terminalElement.style.transform = `translate(0px, 0px)`; // Start with no transform offset
+            
             // Initialize interact.js
             interactInstance = interactjs(terminalElement);
             
@@ -84,6 +98,20 @@
         const target = event.target;
         target.classList.add('dragging');
         isDragging = true;
+        
+        // Store the current computed size to prevent reset
+        const computedStyle = window.getComputedStyle(target);
+        currentSize.width = parseInt(computedStyle.width);
+        currentSize.height = parseInt(computedStyle.height);
+        
+        // Ensure transform is preserved by storing current position
+        const currentX = parseFloat(target.getAttribute('data-x')) || 0;
+        const currentY = parseFloat(target.getAttribute('data-y')) || 0;
+        target.style.transform = `translate(${currentX}px, ${currentY}px)`;
+        
+        // Force the current size using important inline styles
+        target.style.setProperty('width', `${currentSize.width}px`, 'important');
+        target.style.setProperty('height', `${currentSize.height}px`, 'important');
     }
     
     function dragMoveListener(event: any) {
@@ -92,8 +120,17 @@
         const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
         const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
         
-        // Translate the element
-        target.style.transform = `translate(${x}px, ${y}px)`;
+        // Update both CSS position and transform for consistency
+        const initialX = window.innerWidth / 2 - 600;
+        const initialY = window.innerHeight / 2 - 250;
+        
+        target.style.left = `${initialX + x}px`;
+        target.style.top = `${initialY + y}px`;
+        target.style.transform = `translate(0px, 0px)`; // Keep transform at zero since we're using CSS position
+        
+        // Ensure size is maintained during drag
+        target.style.setProperty('width', `${currentSize.width}px`, 'important');
+        target.style.setProperty('height', `${currentSize.height}px`, 'important');
         
         // Update the position attributes
         target.setAttribute('data-x', x);
@@ -103,6 +140,11 @@
     function dragEndListener(event: any) {
         const target = event.target;
         target.classList.remove('dragging');
+        
+        // Remove the important flag but keep the size values
+        target.style.setProperty('width', `${currentSize.width}px`);
+        target.style.setProperty('height', `${currentSize.height}px`);
+        
         // Add a small delay before allowing clicks again
         setTimeout(() => {
             isDragging = false;
@@ -122,6 +164,10 @@
         // Update the element's style
         target.style.width = `${event.rect.width}px`;
         target.style.height = `${event.rect.height}px`;
+        
+        // Update our size tracking
+        currentSize.width = event.rect.width;
+        currentSize.height = event.rect.height;
         
         // Translate when resizing from top or left edges
         x += event.deltaRect.left;
@@ -233,16 +279,26 @@
         touch-action: none;
         box-sizing: border-box;
         
-        /* Position the box in the center of the screen initially */
+        /* Position with stable base coordinates */
         position: absolute;
-        top: calc(50% - 250px); /* Half of initial height (500px) */
-        left: calc(50% - 400px); /* Half of initial width (800px) */
+        top: 0;
+        left: 0;
+        
+        /* Prevent flashing during drag operations */
+        will-change: transform;
+        transform-origin: 0 0;
+        backface-visibility: hidden;
         
         /* Flex layout for content */
         display: flex;
         flex-direction: column;
         align-items: stretch;
         justify-content: flex-start;
+    }
+    
+    /* Disable transitions during drag to prevent flashing */
+    .terminal.dragging {
+        transition: none !important;
     }
     
     .terminal.resizable {
