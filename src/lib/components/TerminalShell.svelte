@@ -596,6 +596,5 @@
 		margin: 0.5rem 0;
 		background: rgba(34, 34, 34, 0.5);
 		overflow-y: auto;
-		max-height: 400px;
 	}
 </style>
