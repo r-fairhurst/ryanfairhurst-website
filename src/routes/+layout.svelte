@@ -2,7 +2,7 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import Terminal from '$lib/components/Terminal.svelte';
 	import TerminalIcon from '$lib/components/TerminalIcon.svelte';
-	import TerminalContent from '$lib/components/TerminalContent.svelte';
+	import TerminalShell from '$lib/components/TerminalShell.svelte';
 	import { page } from '$app/stores';
 
 	let { children } = $props();
@@ -91,8 +91,7 @@
 		onFocus={() => bringToFront(terminal.id)}
 		style="z-index: {terminal.zIndex};"
 	>
-		<TerminalContent 
-			currentPath={terminal.currentPath} 
+		<TerminalShell 
 			terminalId={terminal.id}
 			onNavigate={(path: string) => navigateTerminal(terminal.id, path)}
 		/>
