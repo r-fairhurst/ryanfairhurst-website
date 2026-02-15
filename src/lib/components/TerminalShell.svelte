@@ -1,17 +1,20 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import Home from '$lib/components/pages/Home.svelte';
 	import About from '$lib/components/pages/About.svelte';
 	import Projects from '$lib/components/pages/Projects.svelte';
 	import Contact from '$lib/components/pages/Contact.svelte';
+	import MarkdownRenderer from '$lib/components/MarkdownRenderer.svelte';
 	
 	let { terminalId, onNavigate = () => {} } = $props();
+	
+	let outputAreaElement: HTMLDivElement;
 	
 	let currentPath = $state('/');
 	let commandHistory = $state<string[]>([]);
 	let historyIndex = $state(-1);
 	let displayingContent = $state<string | null>(null);
-	let output = $state<Array<{type: 'command' | 'output' | 'error' | 'content', content: string, contentPath?: string}>>([
+	let output = $state<Array<{type: 'command' | 'output' | 'error' | 'content', content: string, contentPath?: string, githubContent?: string}>>([
 		{ type: 'output', content: 'Welcome to Ryan Fairhurst\'s Portfolio Terminal' },
 		{ type: 'output', content: 'Type "help" for available commands' },
 		{ type: 'output', content: 'Use "ls" to see available files and "cat <file>" to view content' },
@@ -20,9 +23,29 @@
 	let currentCommand = $state('');
 	let inputElement: HTMLInputElement;
 	
+	// Auto-scroll to bottom when output changes
+	function scrollToBottom() {
+		requestAnimationFrame(() => {
+			if (outputAreaElement) {
+				outputAreaElement.scrollTop = outputAreaElement.scrollHeight;
+			}
+		});
+	}
+	
+	// Effect to scroll when output changes
+	$effect(() => {
+		if (output.length > 0) {
+			scrollToBottom();
+		}
+	});
+	
 	const fileSystem: { [key: string]: { files: string[]; directories: string[] } } = {
 		'/': {
 			files: ['about.md', 'projects.md', 'contact.md'],
+			directories: ['writeups']
+		},
+		'/writeups': {
+			files: [],
 			directories: []
 		}
 	};
@@ -32,6 +55,85 @@
 		'/projects.md': '/projects', 
 		'/contact.md': '/contact'
 	};
+	
+	const GITHUB_API_BASE = 'https://api.github.com/repos/r-fairhurst/ctf-writeups/contents';
+	let writeupCache = $state<{[key: string]: any}>({});
+	let loadingWriteups = $state(false);
+	
+	async function fetchWriteups(path: string = ''): Promise<any[]> {
+		try {
+			const url = `${GITHUB_API_BASE}${path}`;
+			const response = await fetch(url);
+			
+			if (!response.ok) {
+				throw new Error(`Failed to fetch: ${response.status}`);
+			}
+			
+			return await response.json();
+		} catch (error) {
+			console.error('Error fetching writeups:', error);
+			return [];
+		}
+	}
+	
+	async function fetchReadmeContent(path: string): Promise<string> {
+		try {
+			const items = await fetchWriteups(path);
+			const readme = items.find(item => 
+				item.name.toLowerCase() === 'readme.md' && item.type === 'file'
+			);
+			
+			if (!readme) {
+				return 'No README found in this directory.';
+			}
+			
+			const response = await fetch(readme.download_url);
+			if (!response.ok) {
+				throw new Error(`Failed to fetch README: ${response.status}`);
+			}
+			
+			return await response.text();
+		} catch (error) {
+			console.error('Error fetching README:', error);
+			return 'Error loading README content.';
+		}
+	}
+	
+	async function loadWriteupsDirectory(path: string): Promise<string[]> {
+		if (writeupCache[path]) {
+			return writeupCache[path];
+		}
+		
+		loadingWriteups = true;
+		try {
+			const items = await fetchWriteups(path);
+			const result = [];
+			
+			for (const item of items) {
+				if (item.type === 'dir') {
+					// Check if this directory contains a README
+					const hasReadme = await fetchWriteups(`${path}/${item.name}`)
+						.then(dirItems => 
+							dirItems.some(dirItem => 
+								dirItem.name.toLowerCase() === 'readme.md' && dirItem.type === 'file'
+							)
+						)
+						.catch(() => false);
+					
+					if (hasReadme) {
+						result.push(`${item.name}.md`);
+					} else {
+						result.push(`${item.name}/`);
+					}
+				}
+			}
+			
+			writeupCache[path] = result;
+			return result;
+		} finally {
+			loadingWriteups = false;
+		}
+	}
 	
 	const commands = {
 		help: () => [
@@ -44,7 +146,7 @@
 			'  help        - show this help message'
 		],
 		
-		ls: () => {
+		ls: async () => {
 			const currentDir = fileSystem[currentPath];
 			if (!currentDir) {
 				return ['Directory not found'];
@@ -52,18 +154,50 @@
 			
 			const items: string[] = [];
 			
-			// Add directories first
-			if (currentDir.directories.length > 0) {
-				currentDir.directories.forEach((dir: string) => {
-					items.push(`  ${dir}/`);
-				});
-			}
-			
-			// Add files
-			if (currentDir.files.length > 0) {
-				currentDir.files.forEach((file: string) => {
-					items.push(`  ${file}`);
-				});
+			// Handle writeups directory specially
+			if (currentPath === '/writeups') {
+				if (loadingWriteups) {
+					return ['Loading writeups from GitHub...'];
+				}
+				
+				try {
+					const writeupItems = await loadWriteupsDirectory('');
+					items.push(...writeupItems.map(item => `  ${item}`));
+				} catch (error) {
+					return ['Error loading writeups from GitHub'];
+				}
+			} 
+			// Handle subdirectories within writeup directories
+			else if (currentPath.startsWith('/writeups/')) {
+				const githubPath = currentPath.replace('/writeups', '');
+				try {
+					const githubItems = await fetchWriteups(githubPath);
+					for (const item of githubItems) {
+						if (item.type === 'dir') {
+							items.push(`  ${item.name}/`);
+						} else if (item.type === 'file') {
+							items.push(`  ${item.name}`);
+						}
+					}
+				} catch (error) {
+					return ['Error loading directory contents from GitHub'];
+				}
+			} 
+			// Handle static directories
+			else {
+				// Add directories first
+				if (currentDir.directories.length > 0) {
+					currentDir.directories.forEach((dir: string) => {
+						items.push(`  ${dir}/`);
+					});
+				}
+				
+				// Add files
+				if (currentDir.files.length > 0) {
+					currentDir.files.forEach((file: string) => {
+						items.push(`  ${file}`);
+					});
+				}
 			}
 			
 			if (items.length === 0) {
@@ -75,7 +209,7 @@
 		
 		pwd: () => [currentPath === '/' ? '/' : currentPath],
 		
-		cd: (args: string[]) => {
+		cd: async (args: string[]) => {
 			if (args.length === 0) {
 				currentPath = '/';
 				onNavigate('/');
@@ -88,7 +222,12 @@
 			if (target === '/') {
 				newPath = '/';
 			} else if (target === '..') {
-				newPath = currentPath === '/' ? '/' : '/';
+				// Handle going back from writeups subdirectories
+				if (currentPath.startsWith('/writeups/')) {
+					newPath = '/writeups';
+				} else {
+					newPath = currentPath === '/' ? '/' : '/';
+				}
 			} else if (target.startsWith('/')) {
 				newPath = target;
 			} else {
@@ -105,7 +244,56 @@
 				return [`cd: ${target}: Not a directory`];
 			}
 			
-			// Check if path exists as a directory
+			// Handle GitHub writeups directories
+			if (currentPath === '/writeups') {
+				try {
+					const items = await fetchWriteups('');
+					const writeupDir = items.find(item => 
+						item.type === 'dir' && (item.name === target || item.name === target.replace('/', ''))
+					);
+					
+					if (writeupDir) {
+						newPath = `/writeups/${writeupDir.name}`;
+						// Dynamically add to file system
+						fileSystem[newPath] = {
+							files: [],
+							directories: []
+						};
+						currentPath = newPath;
+						onNavigate(newPath);
+						return [`Changed to ${newPath}`];
+					}
+				} catch (error) {
+					return [`cd: ${target}: Error accessing directory`];
+				}
+			}
+			
+			// Handle subdirectories within writeup directories
+			if (currentPath.startsWith('/writeups/')) {
+				const parentPath = currentPath.replace('/writeups/', '');
+				try {
+					const items = await fetchWriteups(`/${parentPath}`);
+					const subDir = items.find(item => 
+						item.type === 'dir' && (item.name === target || item.name === target.replace('/', ''))
+					);
+					
+					if (subDir) {
+						newPath = `${currentPath}/${subDir.name}`;
+						// Dynamically add to file system
+						fileSystem[newPath] = {
+							files: [],
+							directories: []
+						};
+						currentPath = newPath;
+						onNavigate(newPath);
+						return [`Changed to ${newPath}`];
+					}
+				} catch (error) {
+					return [`cd: ${target}: Error accessing directory`];
+				}
+			}
+			
+			// Check if path exists as a directory in static file system
 			if (fileSystem.hasOwnProperty(newPath)) {
 				currentPath = newPath;
 				onNavigate(newPath);
@@ -115,7 +303,7 @@
 			}
 		},
 		
-		cat: (args: string[]) => {
+		cat: async (args: string[]) => {
 			if (args.length === 0) {
 				return ['cat: missing file argument'];
 			}
@@ -128,6 +316,65 @@
 				filePath = currentPath === '/' ? `/${file}` : `${currentPath}/${file}`;
 			}
 			
+		// Handle files within writeups directories
+		if (currentPath.startsWith('/writeups')) {
+			try {
+				let githubPath = '';
+				let fileName = file;
+				
+				if (currentPath === '/writeups') {
+					// Looking for a writeup directory's README
+					const writeupName = file.replace('.md', '');
+					const items = await fetchWriteups('');
+					const writeupDir = items.find(item => 
+						item.type === 'dir' && item.name === writeupName
+					);
+					
+					if (!writeupDir) {
+						return [`cat: ${file}: No such writeup found`];
+					}
+					
+					// Fetch README content from the writeup directory
+					const readmeContent = await fetchReadmeContent(`/${writeupDir.name}`);
+					displayingContent = 'github-content';
+					writeupCache[`content-${writeupName}`] = readmeContent;
+					return [`=== ${writeupName} writeup ===`];
+				} else {
+					// We're inside a writeup directory, look for files there
+					githubPath = currentPath.replace('/writeups', '');
+					
+					// Check if file exists in current GitHub directory
+					const items = await fetchWriteups(githubPath);
+					const targetFile = items.find(item => 
+						item.type === 'file' && (item.name === fileName || item.name === fileName.replace('.md', ''))
+					);
+					
+					if (targetFile) {
+						if (targetFile.name.toLowerCase() === 'readme.md' || targetFile.name.toLowerCase().includes('readme')) {
+							const readmeContent = await fetchReadmeContent(githubPath);
+							displayingContent = 'github-content';
+							writeupCache[`content-${fileName.replace('.md', '')}`] = readmeContent;
+							return [`=== ${targetFile.name} ===`];
+						} else {
+							// For other files, fetch content directly
+							const response = await fetch(targetFile.download_url);
+							if (response.ok) {
+								const content = await response.text();
+								displayingContent = 'github-content';
+								writeupCache[`content-${fileName.replace('.md', '')}`] = content;
+								return [`=== ${targetFile.name} ===`];
+							}
+						}
+					}
+					
+					return [`cat: ${file}: No such file found in this directory`];
+				}
+			} catch (error: any) {
+				return [`Error loading file: ${error instanceof Error ? error.message : 'Unknown error'}`];
+			}
+		}
+			
+			// Handle regular static files
 			// Add .md extension if not present and check if file exists
 			if (!file.endsWith('.md')) {
 				const mdFilePath = `${filePath}.md`;
@@ -158,7 +405,7 @@
 		}
 	};
 	
-	function executeCommand(cmd: string) {
+	async function executeCommand(cmd: string) {
 		const trimmed = cmd.trim();
 		if (!trimmed) return;
 		
@@ -175,20 +422,34 @@
 		const args = parts.slice(1);
 		
 		if (commands.hasOwnProperty(command)) {
-			const result = (commands as any)[command](args);
-			result.forEach((line: string) => {
-				output.push({ type: 'output', content: line });
-			});
-			
-			// If cat command was used and content should be displayed
-			if (command === 'cat' && displayingContent) {
-				output.push({ type: 'content', content: '', contentPath: displayingContent });
+			try {
+				const result = await (commands as any)[command](args);
+				result.forEach((line: string) => {
+					output.push({ type: 'output', content: line });
+				});
+				
+				// If cat command was used and content should be displayed
+				if (command === 'cat' && displayingContent) {
+					if (displayingContent === 'github-content') {
+						// Find the writeup name from the args
+						const writeupName = args[0]?.replace('.md', '');
+						const content = writeupCache[`content-${writeupName}`];
+						output.push({ type: 'content', content: '', contentPath: 'github', githubContent: content });
+					} else {
+						output.push({ type: 'content', content: '', contentPath: displayingContent });
+					}
+				}
+			} catch (error: any) {
+				output.push({ type: 'error', content: `Error executing ${command}: ${error.message || 'Unknown error'}` });
 			}
 		} else {
 			output.push({ type: 'error', content: `${command}: command not found` });
 		}
 		
 		output.push({ type: 'output', content: '' });
+		
+		// Ensure scrolling after command execution
+		scrollToBottom();
 	}
 	
 	function getPrompt() {
@@ -229,11 +490,13 @@
 </script>
 
 <div class="terminal-shell" data-terminal-id={terminalId}>
-	<div class="output-area">
+	<div class="output-area" bind:this={outputAreaElement}>
 		{#each output as line}
 			{#if line.type === 'content'}
 				<div class="content-display">
-					{#if line.contentPath === '/'}
+					{#if line.contentPath === 'github' && line.githubContent}
+						<MarkdownRenderer content={line.githubContent} />
+					{:else if line.contentPath === '/'}
 						<Home />
 					{:else if line.contentPath === '/about'}
 						<About />
@@ -322,7 +585,7 @@
 		border: none;
 		outline: none;
 		color: var(--color-red);
-		font-family: monospace;
+		font-family: inherit;
 		font-size: inherit;
 	}
 	
