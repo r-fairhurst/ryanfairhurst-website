@@ -78,6 +78,9 @@
     });
     
     function dragStartListener(event: any) {
+        // Bring terminal to front when drag starts
+        onFocus();
+        
         const target = event.target;
         target.classList.add('dragging');
         isDragging = true;
@@ -186,6 +189,7 @@
             }
         }
     }
+    
 </script>
 
 <div 

@@ -25,18 +25,18 @@
 	
 	// Auto-scroll to bottom when output changes
 	function scrollToBottom() {
-		requestAnimationFrame(() => {
+		setTimeout(() => {
 			if (outputAreaElement) {
 				outputAreaElement.scrollTop = outputAreaElement.scrollHeight;
 			}
-		});
+		}, 10);
 	}
 	
 	// Effect to scroll when output changes
 	$effect(() => {
-		if (output.length > 0) {
-			scrollToBottom();
-		}
+		// React to any change in the output array
+		output.length;
+		scrollToBottom();
 	});
 	
 	const fileSystem: { [key: string]: { files: string[]; directories: string[] } } = {
