@@ -15,11 +15,16 @@
         minWidth = 300,
         minHeight = 200,
         onClose = () => {},
+        onFocus = () => {},
         ...restProps
     } = $props();
     
     let terminalElement: HTMLDivElement;
     let interactInstance: any = null;
+    let isMinimized = $state(false);
+    let isMaximized = $state(false);
+    let originalSize = $state({ width: 1200, height: 500, x: 0, y: 0 });
+    let isDragging = $state(false);
     
     onMount(() => {
         if (terminalElement) {
@@ -75,6 +80,7 @@
     function dragStartListener(event: any) {
         const target = event.target;
         target.classList.add('dragging');
+        isDragging = true;
     }
     
     function dragMoveListener(event: any) {
@@ -94,6 +100,10 @@
     function dragEndListener(event: any) {
         const target = event.target;
         target.classList.remove('dragging');
+        // Add a small delay before allowing clicks again
+        setTimeout(() => {
+            isDragging = false;
+        }, 100);
     }
     
     function resizeStartListener(event: any) {
@@ -130,44 +140,81 @@
     }
     
     function handleMinimize() {
-        console.log('Minimize clicked');
+        isMinimized = !isMinimized;
+        if (terminalElement) {
+            if (isMinimized) {
+                // Store current size and position before minimizing
+                const rect = terminalElement.getBoundingClientRect();
+                const computedStyle = window.getComputedStyle(terminalElement);
+                originalSize = {
+                    width: parseInt(computedStyle.width),
+                    height: parseInt(computedStyle.height),
+                    x: parseFloat(terminalElement.getAttribute('data-x') || '0') || 0,
+                    y: parseFloat(terminalElement.getAttribute('data-y') || '0') || 0
+                };
+            }
+        }
     }
     
     function handleMaximize() {
-        console.log('Maximize clicked');
+        isMaximized = !isMaximized;
+        if (terminalElement) {
+            if (isMaximized) {
+                // Store current size and position before maximizing
+                const rect = terminalElement.getBoundingClientRect();
+                const computedStyle = window.getComputedStyle(terminalElement);
+                originalSize = {
+                    width: parseInt(computedStyle.width),
+                    height: parseInt(computedStyle.height),
+                    x: parseFloat(terminalElement.getAttribute('data-x') || '0') || 0,
+                    y: parseFloat(terminalElement.getAttribute('data-y') || '0') || 0
+                };
+                
+                // Maximize to full viewport
+                terminalElement.style.width = '100vw';
+                terminalElement.style.height = '100vh';
+                terminalElement.style.transform = 'translate(0px, 0px)';
+                terminalElement.setAttribute('data-x', '0');
+                terminalElement.setAttribute('data-y', '0');
+            } else {
+                // Restore original size and position
+                terminalElement.style.width = `${originalSize.width}px`;
+                terminalElement.style.height = `${originalSize.height}px`;
+                terminalElement.style.transform = `translate(${originalSize.x}px, ${originalSize.y}px)`;
+                terminalElement.setAttribute('data-x', originalSize.x.toString());
+                terminalElement.setAttribute('data-y', originalSize.y.toString());
+            }
+        }
     }
 </script>
 
 <div 
     bind:this={terminalElement}
-    class={"terminal " + className + (draggable ? ' draggable' : '') + (resizable ? ' resizable' : '')}
+    class={"terminal " + className + (draggable ? ' draggable' : '') + (resizable ? ' resizable' : '') + (isMinimized ? ' minimized' : '') + (isMaximized ? ' maximized' : '')}
     {...restProps}
 >
     <div class="terminal-header drag-handle">
         <span class="terminal-title">{title}</span>
         <div class="terminal-controls">
-            <button class="control-button minimize" onclick={handleMinimize} title="Minimize">
-                −
+            <button class="control-button maximize" onclick={handleMaximize} title={isMaximized ? "Restore" : "Maximize"}>
+                {isMaximized ? "⧉" : "+"}
             </button>
-            <button class="control-button maximize" onclick={handleMaximize} title="Maximize">
-                +
+            <button class="control-button close" onclick={handleClose} title="Close">
+                ×
             </button>
-            {#if showBackButton}
-                <button class="control-button close" onclick={handleClose} title="Close">
-                    ×
-                </button>
-            {/if}
         </div>
     </div>
-    <div class="terminal-content">
-        {@render children()}
+    <div class="terminal-content" role="button" tabindex="0" aria-label="Terminal content area">
+        {#if !isMinimized}
+            {@render children()}
+        {/if}
     </div>
 </div>
 
 <style>
     .terminal {
         font-family: 'Terminess Nerd Font', system-ui, monospace;
-        background-color: inherit;
+        background-color: #222222;
         color: var(--color-red);
         
         width: 1200px;
@@ -234,6 +281,31 @@
     .terminal.resizing::after {
         border-color: var(--color-red);
         border-style: dashed;
+    }
+    
+    /* Minimized state */
+    .terminal.minimized {
+        height: auto !important;
+        min-height: auto !important;
+    }
+    
+    .terminal.minimized .terminal-content {
+        display: none;
+    }
+    
+    /* Maximized state */
+    .terminal.maximized {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        z-index: 1000;
+        border-radius: 0;
+    }
+    
+    .terminal.maximized::before {
+        display: none; /* Hide resize handle when maximized */
     }
     
     .terminal-header {

@@ -1,16 +1,50 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
 	import Terminal from '$lib/components/Terminal.svelte';
+	import TerminalIcon from '$lib/components/TerminalIcon.svelte';
+	import TerminalContent from '$lib/components/TerminalContent.svelte';
 	import { page } from '$app/stores';
 
 	let { children } = $props();
 	
-	// Generate terminal title based on current route
-	const getTerminalTitle = $derived(() => {
-		const pathname = $page.route?.id || '/';
-		const routeName = pathname === '/' ? 'home' : pathname.replace('/', '');
+	let terminals = $state<Array<{id: number, zIndex: number, currentPath: string}>>([]);
+	let nextTerminalId = 1;
+	let maxZIndex = 1000;
+	
+	// Generate terminal title based on terminal's current path
+	function getTerminalTitle(terminalPath: string) {
+		const routeName = terminalPath === '/' ? 'home' : terminalPath.replace('/', '');
 		return `root@ryanfairhurst:~/${routeName}`;
-	});
+	}
+	
+	function openNewTerminal() {
+		const newTerminal = {
+			id: nextTerminalId++,
+			zIndex: ++maxZIndex,
+			currentPath: '/' // Start each terminal at home
+		};
+		terminals.push(newTerminal);
+	}
+	
+	function closeTerminal(terminalId: number) {
+		terminals = terminals.filter(t => t.id !== terminalId);
+	}
+	
+	function bringToFront(terminalId: number) {
+		terminals = terminals.map(terminal => 
+			terminal.id === terminalId 
+				? { ...terminal, zIndex: ++maxZIndex }
+				: terminal
+		);
+	}
+	
+	function navigateTerminal(terminalId: number, path: string) {
+		terminals = terminals.map(terminal => 
+			terminal.id === terminalId 
+				? { ...terminal, currentPath: path }
+				: terminal
+		);
+	}
 </script>
 
 <svelte:head>
@@ -43,14 +77,27 @@
 	</style>
 </svelte:head>
 
-<Terminal 
-	title={getTerminalTitle()}
-	showBackButton={false} 
-	draggable={true} 
-	resizable={true}
->
-	{@render children()}
-</Terminal>
+<!-- Always show the desktop icon -->
+<TerminalIcon onDoubleClick={openNewTerminal} />
+
+<!-- Render all open terminals -->
+{#each terminals as terminal (terminal.id)}
+	<Terminal 
+		title={getTerminalTitle(terminal.currentPath)}
+		showBackButton={false} 
+		draggable={true} 
+		resizable={true}
+		onClose={() => closeTerminal(terminal.id)}
+		onFocus={() => bringToFront(terminal.id)}
+		style="z-index: {terminal.zIndex};"
+	>
+		<TerminalContent 
+			currentPath={terminal.currentPath} 
+			terminalId={terminal.id}
+			onNavigate={(path: string) => navigateTerminal(terminal.id, path)}
+		/>
+	</Terminal>
+{/each}
 
 <style>
 	:root {
@@ -74,17 +121,20 @@
 		font-size: 3rem;
 		margin-bottom: 0.5rem;
 		border-bottom: 2px solid var(--color-red);
+		color: var(--color-text);
 	}
 
 	:global(h2) {
 		font-size: 2rem;
 		margin-bottom: 0.5rem;
 		border-bottom: 1px solid var(--color-red);
+		color: var(--color-text);
 	}
 
 	:global(h3) {
 		font-size: 1.5rem;
 		margin-bottom: 0.5rem;
+		color: var(--color-text);
 	}
 
 	:global(p) {
