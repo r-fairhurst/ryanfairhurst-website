@@ -3,7 +3,6 @@
 	import Terminal from '$lib/components/Terminal.svelte';
 	import TerminalIcon from '$lib/components/TerminalIcon.svelte';
 	import TerminalShell from '$lib/components/TerminalShell.svelte';
-	import { page } from '$app/stores';
 
 	let { children } = $props();
 	
