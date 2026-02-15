@@ -62,7 +62,6 @@
 		font-family: 'Terminess Nerd Font', system-ui, monospace;
 		
 		transition: all 0.2s ease;
-		border-radius: 8px;
 	}
 	
 	.desktop-icon:hover {
@@ -83,9 +82,7 @@
 		justify-content: center;
 		
 		background: linear-gradient(135deg, var(--color-background) 0%, #333 100%);
-		border: 2px solid var(--color-red);
-		border-radius: 8px;
-		
+		border: 2px solid var(--color-red);	
 		box-shadow: 
 			inset 0 1px 2px rgba(255,255,255,0.1),
 			0 4px 8px rgba(0,0,0,0.3);
@@ -101,7 +98,6 @@
 		color: #ffffff;
 		background: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%);
 		border: 1px solid #999;
-		border-radius: 2px;
 		
 		display: flex;
 		align-items: center;
@@ -133,7 +129,6 @@
 		
 		background: rgba(34, 34, 34, 0.8);
 		padding: 0.2rem 0.5rem;
-		border-radius: 4px;
 		border: 1px solid rgba(193, 48, 48, 0.3);
 	}
 	
