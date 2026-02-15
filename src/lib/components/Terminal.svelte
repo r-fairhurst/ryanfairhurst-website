@@ -18,6 +18,13 @@
         onFocus = () => {},
         ...restProps
     } = $props();
+
+    // Mobile detection
+    let isMobile = $state(false);
+    
+    // Reactive properties that consider mobile state
+    const effectiveDraggable = $derived(draggable && !isMobile);
+    const effectiveResizable = $derived(resizable && !isMobile);
     
     let terminalElement: HTMLDivElement;
     let interactInstance: any = null;
@@ -28,61 +35,83 @@
     let currentSize = $state({ width: 1200, height: 500 }); // Track current size
     
     onMount(() => {
+        // Check for mobile on mount
+        const checkMobile = () => {
+            isMobile = window.innerWidth <= 768; // Standard mobile breakpoint
+        };
+        
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        
         if (terminalElement) {
-            // Set initial position using both CSS properties and transform
-            const initialX = window.innerWidth / 2 - 600; // Half of default width (1200px)
-            const initialY = window.innerHeight / 2 - 250; // Half of default height (500px)
-            
-            // Set position attributes first
-            terminalElement.setAttribute('data-x', initialX.toString());
-            terminalElement.setAttribute('data-y', initialY.toString());
-            
-            // Set both CSS position AND transform to prevent flashing
-            terminalElement.style.left = `${initialX}px`;
-            terminalElement.style.top = `${initialY}px`;
-            terminalElement.style.transform = `translate(0px, 0px)`; // Start with no transform offset
-            
-            // Initialize interact.js
-            interactInstance = interactjs(terminalElement);
-            
-            // Make draggable if enabled - use the drag handle (window header)
-            if (draggable) {
-                interactInstance.draggable({
-                    allowFrom: '.drag-handle', // Only allow dragging from elements with this class
-                    listeners: {
-                        start: dragStartListener,
-                        move: dragMoveListener,
-                        end: dragEndListener
-                    },
-                    modifiers: [
-                        interactjs.modifiers.restrictRect({
-                            restriction: { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight },
-                            elementRect: { top: 0, left: 0, bottom: 1, right: 1 }
-                        })
-                    ]
-                });
+            // Set initial position - mobile uses fixed positioning
+            if (isMobile) {
+                terminalElement.style.position = 'fixed';
+                terminalElement.style.top = '0';
+                terminalElement.style.left = '0';
+                terminalElement.style.width = '100vw';
+                terminalElement.style.height = '100vh';
+                terminalElement.setAttribute('data-x', '0');
+                terminalElement.setAttribute('data-y', '0');
+            } else {
+                // Desktop behavior - center using transform only
+                const initialX = window.innerWidth / 2 - 600; // Half of default width (1200px)
+                const initialY = window.innerHeight / 2 - 250; // Half of default height (500px)
+                
+                // Set position attributes and transform
+                terminalElement.setAttribute('data-x', initialX.toString());
+                terminalElement.setAttribute('data-y', initialY.toString());
+                terminalElement.style.transform = `translate(${initialX}px, ${initialY}px)`;
             }
             
-            // Make resizable if enabled
-            if (resizable) {
-                interactInstance.resizable({
-                    edges: { left: true, right: true, bottom: true, top: true },
-                    listeners: {
-                        start: resizeStartListener,
-                        move: resizeMoveListener,
-                        end: resizeEndListener
-                    },
-                    modifiers: [
-                        interactjs.modifiers.restrictEdges({
-                            outer: { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight }
-                        }),
-                        interactjs.modifiers.restrictSize({
-                            min: { width: minWidth, height: minHeight }
-                        })
-                    ]
-                });
+            // Initialize interact.js only for desktop
+            if (!isMobile) {
+                interactInstance = interactjs(terminalElement);
+                
+                // Make draggable if enabled - use the drag handle (window header)
+                if (effectiveDraggable) {
+                    interactInstance.draggable({
+                        allowFrom: '.drag-handle', // Only allow dragging from elements with this class
+                        listeners: {
+                            start: dragStartListener,
+                            move: dragMoveListener,
+                            end: dragEndListener
+                        },
+                        modifiers: [
+                            interactjs.modifiers.restrictRect({
+                                restriction: { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight },
+                                elementRect: { top: 0, left: 0, bottom: 1, right: 1 }
+                            })
+                        ]
+                    });
+                }
+                
+                // Make resizable if enabled
+                if (effectiveResizable) {
+                    interactInstance.resizable({
+                        edges: { left: true, right: true, bottom: true, top: true },
+                        listeners: {
+                            start: resizeStartListener,
+                            move: resizeMoveListener,
+                            end: resizeEndListener
+                        },
+                        modifiers: [
+                            interactjs.modifiers.restrictEdges({
+                                outer: { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight }
+                            }),
+                            interactjs.modifiers.restrictSize({
+                                min: { width: minWidth, height: minHeight }
+                            })
+                        ]
+                    });
+                }
             }
         }
+        
+        // Cleanup function
+        return () => {
+            window.removeEventListener('resize', checkMobile);
+        };
     });
     
     onDestroy(() => {
@@ -104,14 +133,9 @@
         currentSize.width = parseInt(computedStyle.width);
         currentSize.height = parseInt(computedStyle.height);
         
-        // Ensure transform is preserved by storing current position
-        const currentX = parseFloat(target.getAttribute('data-x')) || 0;
-        const currentY = parseFloat(target.getAttribute('data-y')) || 0;
-        target.style.transform = `translate(${currentX}px, ${currentY}px)`;
-        
-        // Force the current size using important inline styles
-        target.style.setProperty('width', `${currentSize.width}px`, 'important');
-        target.style.setProperty('height', `${currentSize.height}px`, 'important');
+        // Preserve size during drag
+        target.style.width = `${currentSize.width}px`;
+        target.style.height = `${currentSize.height}px`;
     }
     
     function dragMoveListener(event: any) {
@@ -120,17 +144,12 @@
         const x = (parseFloat(target.getAttribute('data-x')) || 0) + event.dx;
         const y = (parseFloat(target.getAttribute('data-y')) || 0) + event.dy;
         
-        // Update both CSS position and transform for consistency
-        const initialX = window.innerWidth / 2 - 600;
-        const initialY = window.innerHeight / 2 - 250;
+        // Update position using transform only
+        target.style.transform = `translate(${x}px, ${y}px)`;
         
-        target.style.left = `${initialX + x}px`;
-        target.style.top = `${initialY + y}px`;
-        target.style.transform = `translate(0px, 0px)`; // Keep transform at zero since we're using CSS position
-        
-        // Ensure size is maintained during drag
-        target.style.setProperty('width', `${currentSize.width}px`, 'important');
-        target.style.setProperty('height', `${currentSize.height}px`, 'important');
+        // Maintain size during drag
+        target.style.width = `${currentSize.width}px`;
+        target.style.height = `${currentSize.height}px`;
         
         // Update the position attributes
         target.setAttribute('data-x', x);
@@ -140,10 +159,6 @@
     function dragEndListener(event: any) {
         const target = event.target;
         target.classList.remove('dragging');
-        
-        // Remove the important flag but keep the size values
-        target.style.setProperty('width', `${currentSize.width}px`);
-        target.style.setProperty('height', `${currentSize.height}px`);
         
         // Add a small delay before allowing clicks again
         setTimeout(() => {
@@ -206,6 +221,9 @@
     }
     
     function handleMaximize() {
+        // Disable maximize on mobile since it's always fullscreen
+        if (isMobile) return;
+        
         isMaximized = !isMaximized;
         if (terminalElement) {
             if (isMaximized) {
@@ -240,15 +258,17 @@
 
 <div 
     bind:this={terminalElement}
-    class={"terminal " + className + (draggable ? ' draggable' : '') + (resizable ? ' resizable' : '') + (isMinimized ? ' minimized' : '') + (isMaximized ? ' maximized' : '')}
+    class={"terminal " + className + (effectiveDraggable ? ' draggable' : '') + (effectiveResizable ? ' resizable' : '') + (isMinimized ? ' minimized' : '') + (isMaximized ? ' maximized' : '') + (isMobile ? ' mobile' : '')}
     {...restProps}
 >
     <div class="terminal-header drag-handle">
         <span class="terminal-title">{title}</span>
         <div class="terminal-controls">
-            <button class="control-button maximize" onclick={handleMaximize} title={isMaximized ? "Restore" : "Maximize"}>
-                {isMaximized ? "⧉" : "+"}
-            </button>
+            {#if !isMobile}
+                <button class="control-button maximize" onclick={handleMaximize} title={isMaximized ? "Restore" : "Maximize"}>
+                    {isMaximized ? "⧉" : "+"}
+                </button>
+            {/if}
             <button class="control-button close" onclick={handleClose} title="Close">
                 ×
             </button>
@@ -279,7 +299,7 @@
         touch-action: none;
         box-sizing: border-box;
         
-        /* Position with stable base coordinates */
+        /* Position for transform origin */
         position: absolute;
         top: 0;
         left: 0;
@@ -438,5 +458,58 @@
         overflow: auto;
         padding: 0.5rem;
         background-color: inherit;
+    }
+    
+    /* Mobile styles */
+    .terminal.mobile {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        border-radius: 0;
+        z-index: 1000;
+        transform: none !important;
+        transition: none !important;
+    }
+    
+    .terminal.mobile::before,
+    .terminal.mobile::after {
+        display: none; /* Hide resize handles on mobile */
+    }
+    
+    .terminal.mobile .terminal-header {
+        cursor: default; /* Disable drag cursor on mobile */
+    }
+    
+    /* Mobile responsive adjustments */
+    @media (max-width: 768px) {
+        .terminal {
+            /* Force mobile layout even if mobile class isn't applied yet */
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            border-radius: 0;
+            transform: none !important;
+        }
+        
+        .terminal::before,
+        .terminal::after {
+            display: none; /* Hide all resize handles */
+        }
+        
+        .terminal-header {
+            cursor: default;
+        }
+        
+        .control-button.maximize {
+            display: none; /* Hide maximize button on mobile */
+        }
+        
+        .terminal-title {
+            font-size: 1.25rem; /* Slightly smaller title on mobile */
+        }
     }
 </style>
